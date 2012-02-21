@@ -1,0 +1,19 @@
+{
+    "init" : false,
+    "base": "cordova",
+    "appDirs": ["android-apps", "web-apps"],
+    "gitRepos": {
+        "cordova-js": {"dir": "callback-js", "uri": "git@github.com:callback/callback-js.git", "sync":true},
+        "android": {"dir": "incubator-cordova-android", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-android.git", "sync":true},
+        "bada": {"dir": "incubator-cordova-bada", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-bada.git", "sync":false},
+        "blackberry": {"dir": "incubator-cordova-blackberry-webworks", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-blackberry-webworks.git", "sync":false},
+        "docs": {"dir": "incubator-cordova-docs", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-docs.git", "sync":true},
+        "ios": {"dir": "incubator-cordova-ios", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-ios.git", "sync":true},
+        "mac": {"dir": "incubator-cordova-mac", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-mac.git", "sync":false},
+        "spec": {"dir": "incubator-cordova-mobile-spec", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-mobile-spec.git", "sync":true},
+        "qt": {"dir": "incubator-cordova-qt", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-qt.git", "sync":false},
+        "webos": {"dir": "incubator-cordova-webos", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-webos.git", "sync":false},
+        "weinre": {"dir": "incubator-cordova-weinre", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-weinre.git", "sync":true},
+        "wp7": {"dir": "incubator-cordova-wp7", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-wp7.git", "sync":true}
+    }
+}
