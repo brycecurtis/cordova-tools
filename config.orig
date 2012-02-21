@@ -3,7 +3,7 @@
     "base": "cordova",
     "appDirs": ["android-apps", "web-apps"],
     "gitRepos": {
-        "cordova-js": {"dir": "callback-js", "uri": "git@github.com:callback/callback-js.git", "sync":true},
+        "cordova-js": {"dir": "incubator-cordova-js", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-js.git", "sync":true},
         "android": {"dir": "incubator-cordova-android", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-android.git", "sync":true},
         "bada": {"dir": "incubator-cordova-bada", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-bada.git", "sync":false},
         "blackberry": {"dir": "incubator-cordova-blackberry-webworks", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-blackberry-webworks.git", "sync":false},
