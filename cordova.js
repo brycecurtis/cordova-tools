@@ -116,7 +116,7 @@ function startWatching() {
     
     // Watch for changes to JS files in cordova-js
     try {
-        var cordovajsBase = base+"/callback-js/lib";
+        var cordovajsBase = base+"/incubator-cordova-js/lib";
         fs.watch(cordovajsBase, function(event, filename) {
                 cordovajsTrigger();
         });
@@ -168,7 +168,7 @@ function cordovajsTrigger() {
 }
 
 /**
- * Change to file in callback-js.
+ * Change to file in cordova-js.
  * Kick off new build.
  */
 function cordovajsChanged() {
@@ -243,7 +243,7 @@ function buildCordova(callback) {
     console.log('***************************************************************');
 
     validateCordovaJSEnv(function() {
-        run('jake', [], base+"/callback-js", callback);
+        run('jake', [], base+"/incubator-cordova-js", callback);
     }, callback);
 }
 
@@ -309,7 +309,7 @@ function buildAndroid(callback) {
     validateAndroidEnv(function(){
 
         // Copy cordova.android.js
-        //copyFileSync(base+"/callback-js/pkg/cordova.android.js", base+"/incubator-cordova-android/framework/assets/js/cordova.android.js");
+        //copyFileSync(base+"/incubator-cordova-js/pkg/cordova.android.js", base+"/incubator-cordova-android/framework/assets/js/cordova.android.js");
         copyFileSync(cordovajsDir+"/pkg/cordova.android.js", androidDir+"/framework/assets/js/cordova.android.js");
         
         // Copy cordova.android.js -> cordova-x.x.x.js
