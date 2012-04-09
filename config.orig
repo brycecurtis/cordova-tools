@@ -1,6 +1,7 @@
 {
     "init" : false,
     "base": "cordova",
+    "git": "cordova",
     "appDirs": ["android-apps", "web-apps"],
     "gitRepos": {
         "cordova-js": {"dir": "incubator-cordova-js", "uri": "https://git-wip-us.apache.org/repos/asf/incubator-cordova-js.git", "sync":true},

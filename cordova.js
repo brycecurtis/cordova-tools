@@ -26,7 +26,8 @@ var androidTimeout = null;          // (object) watch object for kicking off and
 
 var config = null;                  // (object) object read from config file
 var init = false;                   // (boolean) init has been run
-var base = null;                    // (string) base directory where repositories are located
+var base = null;                    // (string) base directory where code repositories are located
+var git = null;                     // (string) base directory where git repositories are located
 var appDirs = null;                 // (array) list of application directories 
 var gitRepos = null;                // (object) list of repositories: key=repo name, value={dir:string, uri:string, sync:boolean}
 
@@ -47,10 +48,11 @@ function main() {
     var list = ['JavaScript: Build new cordova.*.js', 
                 'Android: Build cordova.js/jar', 
                 'Android: Create new project',
-                'Android: Create new mobile-spec project',
+                'Android: Create or update mobile-spec project',
                 'Android: Build project', 
                 'Android: Run project on device or emulator', 
                 'Android: Update project(s) to latest cordova.js/jar',
+                'Android: Modify project to use an older version of cordova.js/jar',
                 'Android: Delete project',
                 'Web: Create or Update Android project',
                 'Web: Delete project',
@@ -82,6 +84,9 @@ function main() {
         }
         else if (i == j++) {
             updateAndroidProject(main);
+        }
+        else if (i == j++) {
+            modifyAndroidVersionProject(main);
         }
         else if (i == j++) {
             deleteAndroidProject(main);
@@ -141,7 +146,7 @@ function startWatching() {
         var androidBase = base+"/incubator-cordova-android/framework";
         var androidFiles = fs.readdirSync(androidBase);
         for (var i=0; i<androidFiles.length; i++) {
-            if (androidFiles[i].search(/^cordova\-\d\.\d\.\d\.jar$/) != -1) {
+            if (androidFiles[i].search(/^cordova\-\w+\.\w+\.\w+\.jar$/) != -1) {
                 var path = androidBase + "/" + androidFiles[i];
                 //console.log("Monitoring file "+path);
                 fs.watch(path, function(event, filename) {
@@ -211,6 +216,38 @@ function androidChanged() {
     
     main();
 }
+
+/**
+ * Get location of Android's cordova js/jar files
+ *
+ * @return {js: file, jar: file}
+ */
+function getJsJar() {
+    var androidDir = base + "/" + gitRepos['android'].dir;
+
+    // Find out actual cordova file names with version to use
+    var jsFile = "";
+    var jarFile = "";
+    files = fs.readdirSync(androidDir+"/framework");
+    for (var i=0; i<files.length; i++) {
+        if (files[i].search(/^cordova\-\w+\.\w+\.\w+\.jar$/) != -1) {
+            jarFile = files[i];
+        }
+    }
+    files = fs.readdirSync(androidDir+"/framework/assets/www");
+    for (var i=0; i<files.length; i++) {
+        if (files[i].search(/^cordova\-\w+\.\w+\.\w+\.js$/) != -1) {
+            jsFile = files[i];
+        }
+    }
+    console.log("Jar file="+jarFile+" JS file="+jsFile);
+    if ((jarFile == "") || (jsFile == "")) {
+        console.log("Android cordova jar and js files not found.");
+        return null;
+    }
+    return {'js': jsFile, 'jar': jarFile};
+}
+
 
 //-----------------------------------------------------------------------------
 // Cordova-js
@@ -314,10 +351,33 @@ function buildAndroid(callback) {
         
         // Copy cordova.android.js -> cordova-x.x.x.js
         // Create cordova-x.x.x.jar
-        run("ant", ["build-javascript"], androidDir+"/framework", function() {
-                run("ant", ["jar"], androidDir+"/framework", callback);                    
-        });
+        run("ant", ["jar"], androidDir+"/framework", function() { buildAndroid2(callback)});                    
+        //run("ant", ["build-javascript"], androidDir+"/framework", function() {
+        //        run("ant", ["jar"], androidDir+"/framework", function() {buildAndroid2(callback)});                    
+        //});
     }, callback);
+}
+
+/**
+ * Copy cordova-x.x.x.jar/js into Android tests
+ *
+ * @param callback
+ */
+function buildAndroid2(callback) {
+    var androidDir = base + "/" + gitRepos['android'].dir;
+
+    // Find out actual cordova file names with version to use
+    var files = getJsJar();
+    if (files == null) {
+        if (callback) callback();
+        return;
+    }
+    
+    // Copy cordova-x.x.x.js/jar
+    copyFileSync(androidDir+"/framework/assets/www/"+files.js, androidDir+"/test/assets/www/"+files.js);
+    copyFileSync(androidDir+"/framework/"+files.jar, androidDir+"/test/libs/"+files.jar);
+    
+    if (callback) callback();
 }
 
 /**
@@ -412,35 +472,20 @@ function createAndroidSpecProject2(callback) {
     fs.mkdirSync(wwwDir);
     wrench.copyDirSyncRecursive(specDir, wwwDir);
     
-   // Find out actual cordova file names with version to use
-    var jsFile = "";
-    var jarFile = "";
-    files = fs.readdirSync(base+"/incubator-cordova-android/framework");
-    for (var i=0; i<files.length; i++) {
-        if (files[i].search(/^cordova\-\d\.\d\.\d\.jar$/) != -1) {
-            jarFile = files[i];
-        }
-    }
-    files = fs.readdirSync(base+"/incubator-cordova-android/framework/assets/www");
-    for (var i=0; i<files.length; i++) {
-        if (files[i].search(/^cordova\-\d\.\d\.\d\.js$/) != -1) {
-            jsFile = files[i];
-        }
-    }
-    console.log("Jar file="+jarFile+" JS file="+jsFile);
-    if ((jsFile == "") || (jarFile == "")) {
-        console.log("Android cordova jar and js files not found.");
+    // Find out actual cordova file names with version to use
+    var files = getJsJar();
+    if (files == null) {
         if (callback) callback();
         return;
     }
 
     // Update cordova.js/jar in project
-    copyFileSync(base+"/incubator-cordova-android/framework/"+jarFile, base+"/android-apps/mobile-spec/libs/"+jarFile);
-    copyFileSync(base+"/incubator-cordova-android/framework/assets/www/"+jsFile, wwwDir+"/"+jsFile);
+    copyFileSync(base+"/incubator-cordova-android/framework/"+files.jar, base+"/android-apps/mobile-spec/libs/"+files.jar);
+    copyFileSync(base+"/incubator-cordova-android/framework/assets/www/"+files.js, wwwDir+"/"+files.js);
 
     // Update phonegap.js to use correct version
     var s1= fs.readFileSync(wwwDir+"/phonegap.js", "ascii");
-    var s2 = s1.replace(/phonegap\-\d\.\d\.\d\.js/g, jsFile);
+    var s2 = s1.replace(/phonegap\-\w+\.\w+\.\w+\.js/g, files.js);
     console.log("s2="+s2);
     fs.writeFileSync(wwwDir+"/phonegap.js", s2);
     
@@ -489,7 +534,9 @@ function buildAndroidProject(callback) {
                         }
                     }
                     curProject = project;
-                    run("ant", ["debug"], base+"/android-apps/"+project, callback);
+                    run("ant", ["clean"], base+"/android-apps/"+project, function() {
+                            run("ant", ["debug"], base+"/android-apps/"+project, callback);
+                    });
             });
         }
     }, callback);
@@ -571,30 +618,22 @@ function updateAndroidProject(callback) {
         else {
             
             // Find out actual cordova file names with version to use
-            var jsFile = "";
-            var jarFile = "";
-            files = fs.readdirSync(base+"/incubator-cordova-android/framework");
-            for (var i=0; i<files.length; i++) {
-                if (files[i].search(/^cordova\-\d\.\d\.\d\.jar$/) != -1) {
-                    jarFile = files[i];
-                }
-            }
-            files = fs.readdirSync(base+"/incubator-cordova-android/framework/assets/www");
-            for (var i=0; i<files.length; i++) {
-                if (files[i].search(/^cordova\-\d\.\d\.\d\.js$/) != -1) {
-                    jsFile = files[i];
-                }
-            }
-            console.log("Jar file: "+jarFile+"  JS file: "+jsFile);
-            if ((jsFile == "") || (jarFile == "")) {
-                console.log("Android cordova jar and js files not found.");
+            var files = getJsJar();
+            if (files == null) {
                 if (callback) callback();
                 return;
             }
             
             // Ask for project name
-            program.prompt('* Enter Android project to update (blank to update all): ', function(project) {
-                    if (project != "") {
+            var s = "";
+            if (curProject) {
+                s = " ("+curProject+")";
+            }
+            program.prompt('* Enter Android project to update or "all" to update all'+s+': ', function(project) {
+                    if ((project == "") && (curProject != "")) {
+                        projects = [curProject];
+                    }
+                    else if (project != "all") {
                         projects = [project];
                     }
                     for (var i=0; i<projects.length; i++) {
@@ -607,12 +646,92 @@ function updateAndroidProject(callback) {
                         // TODO
                         
                         // Copy in new versions
-                        copyFileSync(base+"/incubator-cordova-android/framework/"+jarFile, base+"/android-apps/"+projects[i]+"/libs/"+jarFile);
-                        copyFileSync(base+"/incubator-cordova-android/framework/assets/www/"+jsFile, base+"/android-apps/"+projects[i]+"/assets/www/"+jsFile);
+                        console.log("Copying file: "+base+"/incubator-cordova-android/framework/"+files.jar+" --> "+base+"/android-apps/"+projects[i]+"/libs/"+files.jar);
+                        console.log("Copying file: "+base+"/incubator-cordova-android/framework/assets/www/"+files.js+" --> "+base+"/android-apps/"+projects[i]+"/assets/www/"+files.js);
+                        copyFileSync(base+"/incubator-cordova-android/framework/"+files.jar, base+"/android-apps/"+projects[i]+"/libs/"+files.jar);
+                        copyFileSync(base+"/incubator-cordova-android/framework/assets/www/"+files.js, base+"/android-apps/"+projects[i]+"/assets/www/"+files.js);
                     }
                     if (callback) callback();
             });    
         }
+    }, callback);
+}
+
+/**
+ * Set Anddroid project to use a specific phonegap js and jar version.
+ */
+function modifyAndroidVersionProject(callback) {
+    console.log('***************************************************************');
+    console.log('* Modify Android project...');
+    console.log('***************************************************************');
+    
+    // Make sure directory exists
+    validateAndroidEnv(function() {
+            
+        console.log("* List of projects:");
+        var projects = [];
+        var files = fs.readdirSync(base+"/android-apps");
+        for (var i=0; i<files.length; i++) {
+            var stats = fs.statSync(base+"/android-apps/"+files[i]);
+            if (stats.isDirectory()) {
+                console.log("*  "+files[i]);
+                projects.push(files[i]);
+            }
+        }
+        if (projects.length == 0) {
+            console.log("No projects found.");
+            if (callback) callback();
+            return;
+        }
+        
+        // Ask for project name
+        program.prompt('* Enter Android project to update: ', function(project) {
+                if (project == "") {
+                    console.log("No project entered.");
+                    if (callback) callback();
+                    return;
+                }
+                
+                // List versions that can be used
+                console.log("* List of versions:");
+                var versions = [];
+                var files = fs.readdirSync(base+"/old-versions");
+                for (var i=0; i<files.length; i++) {
+                    var stats = fs.statSync(base+"/old-versions/"+files[i]);
+                    if (stats.isDirectory()) {
+                        console.log("*  "+files[i]);
+                        versions.push(files[i]);
+                    }
+                }
+                if (versions.length == 0) {
+                    console.log("No versions found.");
+                    if (callback) callback();
+                    return;
+                }
+                
+                // Ask for version
+                program.prompt('* Enter version to use: ', function(version) {
+                        if (version == "") {
+                            console.log("No version specified.");
+                            if (callback) callback();
+                            return;
+                        }
+                        
+                        console.log("Updating project "+project+"...");
+                        
+                        // Delete existing versions of cordova.js/jar
+                        // TODO
+                        
+                        // Update cordova.js to use jsFile inside *.html files
+                        // TODO
+                        
+                        // Copy in new versions
+                        copyFileSync(base+"/old-versions/"+version+"/android/"+version+".jar", base+"/android-apps/"+project+"/libs/"+version+".jar");
+                        copyFileSync(base+"/old-versions/"+version+"/android/"+version+".js", base+"/android-apps/"+project+"/assets/www/"+version+".js");
+                        
+                        if (callback) callback();
+                });  
+        });
     }, callback);
 }
 
@@ -812,23 +931,8 @@ function androidProjectFromWebProject2(project) {
     }
 
     // Find out actual cordova file names with version to use
-    var jsFile = "";
-    var jarFile = "";
-    files = fs.readdirSync(base+"/incubator-cordova-android/framework");
-    for (var i=0; i<files.length; i++) {
-        if (files[i].search(/^cordova\-\d\.\d\.\d\.jar$/) != -1) {
-            jarFile = files[i];
-        }
-    }
-    files = fs.readdirSync(base+"/incubator-cordova-android/framework/assets/www");
-    for (var i=0; i<files.length; i++) {
-        if (files[i].search(/^cordova\-\d\.\d\.\d\.js$/) != -1) {
-            jsFile = files[i];
-        }
-    }
-    console.log("Jar file="+jarFile+" JS file="+jsFile);
-    if ((jsFile == "") || (jarFile == "")) {
-        console.log("Android cordova jar and js files not found.");
+    var afiles = getJsJar();
+    if (afiles == null) {
         main();
         return;
     }
@@ -836,7 +940,7 @@ function androidProjectFromWebProject2(project) {
     
     // Delete old files in Android project, including old versions of cordova.js
     for (var i in androidFileStats) {
-        if (i == jsFile) {
+        if (i == afiles.js) {
             sameCordovaVersion = true;
         }
         else {
@@ -848,7 +952,7 @@ function androidProjectFromWebProject2(project) {
     // Delete old cordova.jar
     files = fs.readdirSync(androidDir+"/libs");
     for (var i=0; i<files.length; i++) {
-        if (files[i] != jarFile) {
+        if (files[i] != afiles.jar) {
             console.log("Deleting old "+files[i]+" library from Android project.");
             fs.unlinkSync(androidDir+"/libs/"+files[i]);            
         }
@@ -856,8 +960,8 @@ function androidProjectFromWebProject2(project) {
 
     // Update cordova.js/jar in Android project
     // (Always do this, since during development, we may have a new cordova.js/jar with same version number)
-    copyFileSync(base+"/incubator-cordova-android/framework/"+jarFile, androidDir+"/libs/"+jarFile);
-    copyFileSync(base+"/incubator-cordova-android/framework/assets/www/"+jsFile, androidWWWDir+"/"+jsFile);
+    copyFileSync(base+"/incubator-cordova-android/framework/"+afiles.jar, androidDir+"/libs/"+afiles.jar);
+    copyFileSync(base+"/incubator-cordova-android/framework/assets/www/"+afiles.js, androidWWWDir+"/"+afiles.js);
 
 
     // Update cordova.js in HTML files
@@ -963,7 +1067,7 @@ function deleteWebProject(callback) {
                      
                      // If so, then create dirs and download
                      else {   
-                         wrench.mkdirSyncRecursive(base);
+                         wrench.mkdirSyncRecursive(git);
                          downloadCordova(function() {
                                  config.set("init", true);
                                  //saveConfig();
@@ -989,12 +1093,12 @@ function downloadCordova(callback) {
     // Create dirs if not already there
     for (var i=0; i<appDirs.length; i++) {
         try {
-            fs.statSync(base+"/"+appDirs[i]);
-            console.log("Dir "+base+"/"+appDirs[i]+" already exists.");
+            fs.statSync(git+"/"+appDirs[i]);
+            console.log("Dir "+git+"/"+appDirs[i]+" already exists.");
         }
         catch (e) {
-            fs.mkdirSync(base+"/"+appDirs[i]);
-            console.log("Creating dir "+base+"/"+appDirs[i]);
+            fs.mkdirSync(git+"/"+appDirs[i]);
+            console.log("Creating dir "+git+"/"+appDirs[i]);
         }
     }
     
@@ -1023,9 +1127,11 @@ function downloadCordovaRepository(iterator, completeCallback) {
             
             // If repo already exists, then "git pull"
             try {
-                fs.statSync(base+"/"+repo.dir);
+                fs.statSync(git+"/"+repo.dir);
                 console.log("Updating repository "+repo.dir);
-                run("git", ["pull", "origin", "master"], base+"/"+repo.dir, function() {
+                console.log(" dir="+git+"/"+repo.dir);
+                
+                run("git", ["pull", "origin"], git+"/"+repo.dir, function() {
                         downloadCordovaRepository(iterator, completeCallback);
                 });
             }
@@ -1033,7 +1139,7 @@ function downloadCordovaRepository(iterator, completeCallback) {
             // If repo doesn't exist, then "git clone"
             catch (e) {
                 console.log("Creating repository "+repo.dir);
-                run("git", ["clone", repo.uri], base, function() {
+                run("git", ["clone", repo.uri], git, function() {
                         downloadCordovaRepository(iterator, completeCallback);
                 });
             }
@@ -1123,11 +1229,11 @@ function fileExists(path) {
  */
 function run(cmd, args, cwd, callback) {
     console.log('***************************************************************');
-    console.log("* Execute '"+cmd+"':");
+    console.log("* Execute '"+cmd+" "+args+"':");
     console.log('***************************************************************');
     var util  = require('util');
     var spawn = require('child_process').spawn;
-    ls    = spawn(cmd, args, {cwd: cwd});
+    var ls    = spawn(cmd, args, {cwd: cwd});
     ls.stdout.on('data', function (data) {
             console.log(''+data);
     });
@@ -1197,6 +1303,7 @@ function Configuration() {
     this.save = function() {
         //config.data.init = init;
         //config.data.base = base;
+        //config.data.git = git;
         //config.data.appDirs = appDirs;
         //config.data.gitRepos = gitRepos;
         
@@ -1238,6 +1345,7 @@ function Configuration() {
 function saveConfig() {
     config.init = init;
     config.base = base;
+    config.git = git;
     config.appDirs = appDirs;
     config.gitRepos = gitRepos;
 
@@ -1259,10 +1367,10 @@ function configReposPrompt(callback) {
     console.log('* Configuration:                                              *');
     console.log('***************************************************************');
     
-    program.prompt('* Base directory ('+base+'): ', function(r){
+    program.prompt('* Git directory ('+git+'): ', function(r){
             if (r != "") {
-                base = r;
-                config.set("base", base);
+                git = r;
+                config.set("git", git);
             }
             configReposPromptItem(new Iterator(gitRepos), callback);
     });
@@ -1317,6 +1425,7 @@ config = new Configuration();
 config.load();
 init = config.get("init");
 base = config.get("base");
+git = config.get("git");
 appDirs = config.get("appDirs");
 gitRepos = config.get("gitRepos");
 console.log("init="+init);
